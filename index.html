@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pokémon Budget Tracker</title>
+    <title id="page-title">PKMN Budget Tracker</title>
+    <link rel="icon" href="favicon.ico">
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -75,6 +76,20 @@
             font-weight: bold;
         }
         
+        .health-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .health-controls button {
+            width: 100px;
+            border: 2px solid #333;
+            font-weight: bold;
+        }
+        
         .input-section {
             display: flex;
             flex-direction: column;
@@ -126,6 +141,15 @@
             color: #4CAF50;
         }
         
+        #effect-message {
+            color: #D32F2F;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        
         @media (max-width: 600px) {
             .container {
                 padding: 20px;
@@ -135,7 +159,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Pokémon Budget Tracker</h1>
+        <input type="text" id="tracker-title" value="PKMN Budget Tracker" style="width:100%; font-size:28px; text-align:center; margin-bottom:30px; border:none; border-bottom:2px solid #333; padding-bottom:10px; font-weight:bold;">
         
         <div class="pokemon-health-display">
             <div class="health-bars">
@@ -147,6 +171,13 @@
             <div class="health-info">
                 <span id="current-budget">$0</span>
                 <span id="max-budget">/ $0</span>
+            </div>
+            <div id="effect-message">It's Super Effective!</div>
+            <div class="health-controls">
+                <button id="decrease-health-75" style="background-color: #EF9A9A;">-75</button>
+                <button id="decrease-health" style="background-color: #FFCDD2;">-10</button>
+                <button id="increase-health" style="background-color: #BBDEFB;">+10</button>
+                <button id="increase-health-75" style="background-color: #90CAF9;">+75</button>
             </div>
         </div>
         
@@ -163,7 +194,8 @@
             <input type="text" id="description" placeholder="Transaction description">
             
             <button id="add-transaction">Add Transaction</button>
-            <button id="reset-transactions" style="background-color: #E53935; color: white;">Reset All Data</button>
+            <button id="reset-transactions" style="background-color: #E53935; color: white; margin-right: 10px;">Reset All Data</button>
+            <button id="export-transactions" style="background-color: #4CAF50; color: white;">Export History</button>
         </div>
         
         <div class="transaction-history">
@@ -187,6 +219,7 @@
             const currentBudgetDisplay = document.getElementById('current-budget');
             const maxBudgetDisplay = document.getElementById('max-budget');
             const transactionsContainer = document.getElementById('transactions');
+            const effectMessage = document.getElementById('effect-message');
             
             // Load saved data when page loads
             function loadSavedData() {
@@ -205,12 +238,23 @@
                 }
             }
             
+            // Load tracker title if saved
+            const savedTitle = localStorage.getItem('trackerTitle');
+            const titleInput = document.getElementById('tracker-title');
+            if (savedTitle) {
+                titleInput.value = savedTitle;
+            }
+            titleInput.addEventListener('change', function() {
+                localStorage.setItem('trackerTitle', this.value);
+                document.getElementById('page-title').textContent = this.value;
+            });
+
             loadSavedData();
             
             // Set initial budget when user types in the initial budget field
             initialBudgetInput.addEventListener('change', function() {
                 maxBudget = Number(this.value);
-                currentBudget = maxBudget;
+                currentBudget = maxBudget; // Set current budget to max budget initially
                 updateBudgetDisplay();
             });
             
@@ -271,6 +315,29 @@
                 descriptionInput.value = '';
             });
             
+            // Export transactions handler
+            document.getElementById('export-transactions').addEventListener('click', function() {
+                if (transactions.length === 0) {
+                    alert('No transactions to export!');
+                    return;
+                }
+                
+                let exportData = "Date\tDescription\tAmount\tType\n";
+                transactions.forEach(t => {
+                    exportData += `${t.date}\t${t.description}\t${t.amount.toFixed(2)}\t${t.type}\n`;
+                });
+                
+                const blob = new Blob([exportData], {type: 'text/plain'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'budget_transactions.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
             // Reset button click handler
             document.getElementById('reset-transactions').addEventListener('click', function() {
                 if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
@@ -278,6 +345,8 @@
                     localStorage.removeItem('budgetTransactions');
                     localStorage.removeItem('currentBudget');
                     localStorage.removeItem('maxBudget');
+                    localStorage.removeItem('trackerTitle');
+                    document.getElementById('tracker-title').value = 'PKMN Budget Tracker';
                     
                     // Clear UI
                     transactionsContainer.innerHTML = '';
@@ -286,6 +355,41 @@
                     initialBudgetInput.value = '';
                     updateBudgetDisplay();
                 }
+            });
+
+            // Health control buttons
+            document.getElementById('decrease-health').addEventListener('click', function() {
+                if (maxBudget === 0) return;
+                currentBudget = Math.max(0, currentBudget - 10);
+                updateBudgetDisplay();
+                localStorage.setItem('currentBudget', currentBudget);
+            });
+
+            document.getElementById('increase-health').addEventListener('click', function() {
+                if (maxBudget === 0) return;
+                currentBudget = Math.min(maxBudget, currentBudget + 10);
+                updateBudgetDisplay();
+                localStorage.setItem('currentBudget', currentBudget);
+            });
+
+            document.getElementById('decrease-health-75').addEventListener('click', function() {
+                if (maxBudget === 0) return;
+                currentBudget = Math.max(0, currentBudget - 75);
+                updateBudgetDisplay();
+                localStorage.setItem('currentBudget', currentBudget);
+                
+                // Show super effective message
+                effectMessage.style.opacity = '1';
+                setTimeout(() => {
+                    effectMessage.style.opacity = '0';
+                }, 2000);
+            });
+
+            document.getElementById('increase-health-75').addEventListener('click', function() {
+                if (maxBudget === 0) return;
+                currentBudget = Math.min(maxBudget, currentBudget + 75);
+                updateBudgetDisplay();
+                localStorage.setItem('currentBudget', currentBudget);
             });
             
             function updateBudgetDisplay() {
@@ -332,3 +436,4 @@
     </script>
 </body>
 </html>
+
