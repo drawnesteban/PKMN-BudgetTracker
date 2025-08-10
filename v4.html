@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">PKMN Budget Tracker</title>
+    <link rel="icon" href="favicon.ico">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 30px; /* Add margin between multiple tools */
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .pokemon-health-display {
+            margin-bottom: 30px;
+        }
+        
+        .health-bars {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .health-bar-container {
+            width: 100%;
+            height: 30px;
+            background-color: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+            border: 2px solid #333;
+        }
+        
+        .health-bar {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 100%;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+        
+        .pokeball {
+            width: 30px;
+            height: 30px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            /* Add a placeholder image for the pokeball */
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/><path d="M5 50h90" stroke="black" stroke-width="5"/><circle cx="50" cy="50" r="15" fill="white" stroke="black" stroke-width="5"/><circle cx="50" cy="50" r="8" fill="black"/></svg>');
+        }
+        
+        .health-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-weight: bold;
+        }
+        
+        .health-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .health-controls button {
+            width: 100px;
+            border: 2px solid #333;
+            font-weight: bold;
+        }
+        
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        input, select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        button {
+            background-color: #FFCB05;
+            color: #333;
+            border: none;
+            border-radius: 5px;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #F5C100;
+        }
+        
+        .transaction-history {
+            margin-top: 30px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .cost {
+            color: #E53935;
+            font-weight: bold;
+        }
+        
+        .positive {
+            color: #4CAF50;
+        }
+        
+        .effect-message { /* Changed from #effect-message to class */
+            color: #D32F2F;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Template for a single budget tracker tool -->
+    <template id="tool-template">
+        <div class="container">
+            <input type="text" class="tracker-title" value="PKMN Budget Tracker" style="width:100%; font-size:28px; text-align:center; margin-bottom:30px; border:none; border-bottom:2px solid #333; padding-bottom:10px; font-weight:bold;">
+            
+            <div class="pokemon-health-display">
+                <div class="health-bars">
+                    <div class="health-bar-container">
+                        <div class="health-bar"></div>
+                    </div>
+                    <div class="pokeball"></div>
+                </div>
+                <div class="health-info">
+                    <span class="current-budget">$0</span>
+                    <span class="max-budget">/ $0</span>
+                </div>
+                <div class="effect-message">It's Super Effective!</div>
+                <div class="health-controls">
+                    <button class="decrease-health-75" style="background-color: #EF9A9A;">-75</button>
+                    <button class="decrease-health" style="background-color: #FFCDD2;">-10</button>
+                    <button class="increase-health" style="background-color: #BBDEFB;">+10</button>
+                    <button class="increase-health-75" style="background-color: #90CAF9;">+75</button>
+                </div>
+            </div>
+            
+            <div class="input-section">
+                <input type="number" class="initial-budget" placeholder="Enter initial budget" min="0">
+                
+                <select class="transaction-type">
+                    <option value="expense">Expense</option>
+                    <option value="income">Income</option>
+                </select>
+                
+                <input type="number" class="amount" placeholder="Enter amount" min="0">
+                
+                <input type="text" class="description" placeholder="Transaction description">
+                
+                <button class="add-transaction">Add Transaction</button>
+                <button class="reset-transactions" style="background-color: #E53935; color: white; margin-right: 10px;">Reset All Data</button>
+                <button class="export-transactions" style="background-color: #4CAF50; color: white;">Export History</button>
+            </div>
+            
+            <div class="transaction-history">
+                <h3>Transaction History</h3>
+                <div class="transactions"></div>
+            </div>
+            <!-- NEW: Remove button for this instance -->
+            <button class="remove-tracker" style="background-color: #D32F2F; color: white; margin-top: 20px;">Remove This Tracker</button>
+        </div>
+    </template>
+
+    <!-- Container where all tool instances will be appended -->
+    <div id="tools-container"></div>
+
+    <!-- Button to add new tool instances -->
+    <button id="add-new-tool" style="margin-top: 20px; padding: 15px 30px; font-size: 18px;">Add New Tracker</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const toolTemplate = document.getElementById('tool-template');
+            const toolsContainer = document.getElementById('tools-container');
+            const addNewToolBtn = document.getElementById('add-new-tool');
+
+            // This will now store objects with tool data and potentially a reference to the DOM element
+            let toolInstances = []; 
+
+            // Function to save the entire state of all tools
+            function saveAllToolStates() {
+                // Clear all existing tool data from localStorage
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('toolData_') || key.startsWith('trackerTitle_')) {
+                        localStorage.removeItem(key);
+                    }
+                }
+                // Save current tool states with new indices
+                toolInstances.forEach((instance, index) => {
+                    if (instance) { // Ensure instance exists (not null after removal)
+                        localStorage.setItem(`toolData_${index}`, JSON.stringify({
+                            currentBudget: instance.currentBudget,
+                            maxBudget: instance.maxBudget,
+                            transactions: instance.transactions
+                        }));
+                        localStorage.setItem(`trackerTitle_${index}`, instance.trackerTitle);
+                    }
+                });
+            }
+
+            // Function to load all tool states and re-render them
+            function loadAllToolStates() {
+                // Clear existing tools from the DOM
+                toolsContainer.innerHTML = '';
+                toolInstances = []; // Reset the array
+
+                let i = 0;
+                while (localStorage.getItem(`toolData_${i}`)) {
+                    const savedData = JSON.parse(localStorage.getItem(`toolData_${i}`));
+                    const savedTitle = localStorage.getItem(`trackerTitle_${i}`);
+
+                    const clone = toolTemplate.content.cloneNode(true);
+                    const newToolElement = clone.querySelector('.container');
+                    toolsContainer.appendChild(newToolElement);
+
+                    // Initialize the tool with loaded data
+                    initializeTool(newToolElement, i, savedData, savedTitle);
+                    i++;
+                }
+                // If no tools were loaded, add one default tool
+                if (i === 0) {
+                    addNewToolInstance();
+                }
+            }
+
+            function initializeTool(toolElement, instanceIndex, savedData = {}, savedTitle = 'PKMN Budget Tracker') {
+                // Get references to elements *within this specific tool instance*
+                const initialBudgetInput = toolElement.querySelector('.initial-budget');
+                const transactionTypeSelect = toolElement.querySelector('.transaction-type');
+                const amountInput = toolElement.querySelector('.amount');
+                const descriptionInput = toolElement.querySelector('.description');
+                const addTransactionBtn = toolElement.querySelector('.add-transaction');
+                const healthBar = toolElement.querySelector('.health-bar');
+                const currentBudgetDisplay = toolElement.querySelector('.current-budget');
+                const maxBudgetDisplay = toolElement.querySelector('.max-budget');
+                const transactionsContainer = toolElement.querySelector('.transactions');
+                const effectMessage = toolElement.querySelector('.effect-message');
+                const trackerTitleInput = toolElement.querySelector('.tracker-title');
+                const resetTransactionsBtn = toolElement.querySelector('.reset-transactions');
+                const exportTransactionsBtn = toolElement.querySelector('.export-transactions');
+                const removeTrackerBtn = toolElement.querySelector('.remove-tracker'); // NEW: Remove button
+
+                // Health control buttons
+                const decreaseHealth75Btn = toolElement.querySelector('.decrease-health-75');
+                const decreaseHealthBtn = toolElement.querySelector('.decrease-health');
+                const increaseHealthBtn = toolElement.querySelector('.increase-health');
+                const increaseHealth75Btn = toolElement.querySelector('.increase-health-75');
+
+                // Initialize data for this tool instance
+                let currentBudget = savedData.currentBudget || 0;
+                let maxBudget = savedData.maxBudget || 0;
+                let transactions = savedData.transactions || [];
+                let trackerTitle = savedTitle;
+
+                // Store references and data for this instance
+                toolInstances[instanceIndex] = {
+                    toolElement,
+                    currentBudget,
+                    maxBudget,
+                    transactions,
+                    trackerTitle,
+                    // Add references to elements if you need to access them directly from toolInstances array
+                    initialBudgetInput,
+                    trackerTitleInput,
+                    transactionsContainer,
+                    healthBar,
+                    currentBudgetDisplay,
+                    maxBudgetDisplay,
+                    effectMessage
+                };
+
+                // Set initial values from loaded data
+                if (maxBudget > 0) {
+                    initialBudgetInput.value = maxBudget;
+                }
+                trackerTitleInput.value = trackerTitle;
+                transactions.forEach(t => addTransactionToHistory(t));
+                updateBudgetDisplay();
+
+                // Update the main page title only if it's the first tracker
+                if (instanceIndex === 0) {
+                    document.getElementById('page-title').textContent = trackerTitle;
+                }
+
+                // Event Listeners
+                trackerTitleInput.addEventListener('change', function() {
+                    toolInstances[instanceIndex].trackerTitle = this.value;
+                    if (instanceIndex === 0) {
+                        document.getElementById('page-title').textContent = this.value;
+                    }
+                    saveToolData();
+                });
+
+                initialBudgetInput.addEventListener('change', function() {
+                    maxBudget = Number(this.value);
+                    currentBudget = maxBudget;
+                    toolInstances[instanceIndex].maxBudget = maxBudget;
+                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    updateBudgetDisplay();
+                    saveToolData();
+                });
+
+                addTransactionBtn.addEventListener('click', function() {
+                    if (maxBudget === 0) {
+                        alert('Please set an initial budget first!');
+                        return;
+                    }
+
+                    const amount = Number(amountInput.value);
+                    const description = descriptionInput.value;
+                    const type = transactionTypeSelect.value;
+
+                    if (amount <= 0) {
+                        alert('Please enter a valid amount');
+                        return;
+                    }
+
+                    if (!description) {
+                        alert('Please enter a description');
+                        return;
+                    }
+
+                    if (type === 'expense' && amount > currentBudget) {
+                        alert('Not enough budget!');
+                        return;
+                    }
+
+                    const transaction = {
+                        type: type,
+                        amount: amount,
+                        description: description,
+                        date: new Date().toLocaleDateString()
+                    };
+
+                    transactions.push(transaction);
+                    toolInstances[instanceIndex].transactions = transactions; // Update the stored array
+
+                    if (type === 'expense') {
+                        currentBudget -= amount;
+                    } else {
+                        currentBudget += amount;
+                    }
+                    toolInstances[instanceIndex].currentBudget = currentBudget; // Update stored budget
+
+                    updateBudgetDisplay();
+                    addTransactionToHistory(transaction);
+                    saveToolData();
+
+                    amountInput.value = '';
+                    descriptionInput.value = '';
+                });
+
+                exportTransactionsBtn.addEventListener('click', function() {
+                    if (transactions.length === 0) {
+                        alert('No transactions to export!');
+                        return;
+                    }
+
+                    let exportData = "Date\tDescription\tAmount\tType\n";
+                    transactions.forEach(t => {
+                        exportData += `${t.date}\t${t.description}\t${t.amount.toFixed(2)}\t${t.type}\n`;
+                    });
+
+                    const blob = new Blob([exportData], {type: 'text/plain'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `budget_transactions_tracker_${instanceIndex}.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                });
+
+                resetTransactionsBtn.addEventListener('click', function() {
+                    if (confirm('Are you sure you want to reset all data for this tracker? This cannot be undone.')) {
+                        transactionsContainer.innerHTML = '';
+                        currentBudget = 0;
+                        maxBudget = 0;
+                        transactions = []; // Reset local array
+                        trackerTitle = 'PKMN Budget Tracker'; // Reset local title
+
+                        // Update the stored instance data
+                        toolInstances[instanceIndex].currentBudget = currentBudget;
+                        toolInstances[instanceIndex].maxBudget = maxBudget;
+                        toolInstances[instanceIndex].transactions = transactions;
+                        toolInstances[instanceIndex].trackerTitle = trackerTitle;
+
+                        initialBudgetInput.value = '';
+                        trackerTitleInput.value = trackerTitle;
+                        updateBudgetDisplay();
+                        saveToolData(); // Save the reset state
+                    }
+                });
+
+                // NEW: Remove Tracker Button Event Listener
+                removeTrackerBtn.addEventListener('click', function() {
+                    if (confirm('Are you sure you want to remove this tracker? All its data will be lost.')) {
+                        // Remove the HTML element from the DOM
+                        toolElement.remove();
+
+                        // Remove the instance data from the toolInstances array
+                        // Using splice might shift indices, so setting to null or filtering is safer
+                        toolInstances[instanceIndex] = null; // Mark for removal
+
+                        // Re-save all tool states to re-index and clean up localStorage
+                        // Filter out nulls and re-assign toolInstances
+                        toolInstances = toolInstances.filter(instance => instance !== null);
+                        saveAllToolStates();
+
+                        // If the removed tracker was the first one, update the page title
+                        if (instanceIndex === 0 && toolInstances.length > 0) {
+                            document.getElementById('page-title').textContent = toolInstances[0].trackerTitle;
+                        } else if (toolInstances.length === 0) {
+                            document.getElementById('page-title').textContent = 'PKMN Budget Tracker';
+                        }
+                    }
+                });
+
+
+                decreaseHealthBtn.addEventListener('click', function() {
+                    if (maxBudget === 0) return;
+                    currentBudget = Math.max(0, currentBudget - 10);
+                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    updateBudgetDisplay();
+                    saveToolData();
+                });
+
+                increaseHealthBtn.addEventListener('click', function() {
+                    if (maxBudget === 0) return;
+                    currentBudget = Math.min(maxBudget, currentBudget + 10);
+                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    updateBudgetDisplay();
+                    saveToolData();
+                });
+
+                decreaseHealth75Btn.addEventListener('click', function() {
+                    if (maxBudget === 0) return;
+                    currentBudget = Math.max(0, currentBudget - 75);
+                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    updateBudgetDisplay();
+                    saveToolData();
+
+                    effectMessage.style.opacity = '1';
+                    setTimeout(() => {
+                        effectMessage.style.opacity = '0';
+                    }, 2000);
+                });
+
+                increaseHealth75Btn.addEventListener('click', function() {
+                    if (maxBudget === 0) return;
+                    currentBudget = Math.min(maxBudget, currentBudget + 75);
+                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    updateBudgetDisplay();
+                    saveToolData();
+                });
+
+                function updateBudgetDisplay() {
+                    const percentage = (maxBudget === 0) ? 0 : (currentBudget / maxBudget) * 100;
+                    healthBar.style.width = `${percentage}%`;
+
+                    if (percentage > 60) {
+                        healthBar.style.backgroundColor = '#4CAF50';
+                    } else if (percentage > 30) {
+                        healthBar.style.backgroundColor = '#FFC107';
+                    } else {
+                        healthBar.style.backgroundColor = '#F44336';
+                    }
+
+                    currentBudgetDisplay.textContent = `$${currentBudget.toFixed(2)}`;
+                    maxBudgetDisplay.textContent = `/ $${maxBudget.toFixed(2)}`;
+                }
+
+                function addTransactionToHistory(transaction) {
+                    const transactionElement = document.createElement('div');
+                    transactionElement.className = 'transaction-item';
+
+                    const descriptionElement = document.createElement('span');
+                    descriptionElement.textContent = `${transaction.description}`;
+
+                    const amountElement = document.createElement('span');
+                    amountElement.textContent = `$${transaction.amount.toFixed(2)}`;
+                    amountElement.className = transaction.type === 'expense' ? 'cost' : 'positive';
+
+                    const dateElement = document.createElement('span');
+                    dateElement.textContent = transaction.date;
+                    dateElement.style.color = '#777';
+
+                    transactionElement.appendChild(descriptionElement);
+                    transactionElement.appendChild(dateElement);
+                    transactionElement.appendChild(amountElement);
+
+                    transactionsContainer.prepend(transactionElement);
+                }
+            }
+
+            // Function to add a new tool instance
+            function addNewToolInstance() {
+                const clone = toolTemplate.content.cloneNode(true);
+                const newToolElement = clone.querySelector('.container');
+                toolsContainer.appendChild(newToolElement);
+                const instanceIndex = toolInstances.length; // Get the next available index
+                initializeTool(newToolElement, instanceIndex);
+                saveAllToolStates(); // Save the new state
+            }
+
+            // Add event listener for the "Add New Tracker" button
+            addNewToolBtn.addEventListener('click', addNewToolInstance);
+
+            // Load all tool states when the page loads
+            loadAllToolStates();
+        });
+    </script>
+</body>
+</html>
