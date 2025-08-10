@@ -224,57 +224,47 @@
             const toolsContainer = document.getElementById('tools-container');
             const addNewToolBtn = document.getElementById('add-new-tool');
 
-            // This will now store objects with tool data and potentially a reference to the DOM element
+            // This array will now hold the DATA for each tool instance,
+            // and each object in the array will also store references to its DOM elements.
             let toolInstances = []; 
 
-            // Function to save the entire state of all tools
+            // Function to save the entire state of all tools to localStorage
             function saveAllToolStates() {
-                // Clear all existing tool data from localStorage
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key.startsWith('toolData_') || key.startsWith('trackerTitle_')) {
-                        localStorage.removeItem(key);
-                    }
-                }
-                // Save current tool states with new indices
-                toolInstances.forEach((instance, index) => {
-                    if (instance) { // Ensure instance exists (not null after removal)
-                        localStorage.setItem(`toolData_${index}`, JSON.stringify({
-                            currentBudget: instance.currentBudget,
-                            maxBudget: instance.maxBudget,
-                            transactions: instance.transactions
-                        }));
-                        localStorage.setItem(`trackerTitle_${index}`, instance.trackerTitle);
-                    }
-                });
+                // Prepare data for saving: only the essential properties
+                const dataToSave = toolInstances.map(instance => ({
+                    currentBudget: instance.currentBudget,
+                    maxBudget: instance.maxBudget,
+                    transactions: instance.transactions,
+                    trackerTitle: instance.trackerTitle
+                }));
+                localStorage.setItem('allToolData', JSON.stringify(dataToSave));
             }
 
-            // Function to load all tool states and re-render them
+            // Function to load all tool states from localStorage and rebuild the UI
             function loadAllToolStates() {
                 // Clear existing tools from the DOM
                 toolsContainer.innerHTML = '';
                 toolInstances = []; // Reset the array
 
-                let i = 0;
-                while (localStorage.getItem(`toolData_${i}`)) {
-                    const savedData = JSON.parse(localStorage.getItem(`toolData_${i}`));
-                    const savedTitle = localStorage.getItem(`trackerTitle_${i}`);
+                const savedAllToolData = JSON.parse(localStorage.getItem('allToolData')) || [];
 
-                    const clone = toolTemplate.content.cloneNode(true);
-                    const newToolElement = clone.querySelector('.container');
-                    toolsContainer.appendChild(newToolElement);
-
-                    // Initialize the tool with loaded data
-                    initializeTool(newToolElement, i, savedData, savedTitle);
-                    i++;
-                }
-                // If no tools were loaded, add one default tool
-                if (i === 0) {
+                if (savedAllToolData.length > 0) {
+                    savedAllToolData.forEach((data, index) => {
+                        const clone = toolTemplate.content.cloneNode(true);
+                        const newToolElement = clone.querySelector('.container');
+                        toolsContainer.appendChild(newToolElement);
+                        // Initialize the tool with loaded data
+                        initializeTool(newToolElement, index, data);
+                    });
+                } else {
+                    // If no saved data, add one default tool
                     addNewToolInstance();
                 }
             }
 
-            function initializeTool(toolElement, instanceIndex, savedData = {}, savedTitle = 'PKMN Budget Tracker') {
+            // This function initializes a single tool instance
+            // It now takes an 'initialData' object to populate its state
+            function initializeTool(toolElement, instanceIndex, initialData = {}) {
                 // Get references to elements *within this specific tool instance*
                 const initialBudgetInput = toolElement.querySelector('.initial-budget');
                 const transactionTypeSelect = toolElement.querySelector('.transaction-type');
@@ -289,7 +279,7 @@
                 const trackerTitleInput = toolElement.querySelector('.tracker-title');
                 const resetTransactionsBtn = toolElement.querySelector('.reset-transactions');
                 const exportTransactionsBtn = toolElement.querySelector('.export-transactions');
-                const removeTrackerBtn = toolElement.querySelector('.remove-tracker'); // NEW: Remove button
+                const removeTrackerBtn = toolElement.querySelector('.remove-tracker');
 
                 // Health control buttons
                 const decreaseHealth75Btn = toolElement.querySelector('.decrease-health-75');
@@ -297,62 +287,50 @@
                 const increaseHealthBtn = toolElement.querySelector('.increase-health');
                 const increaseHealth75Btn = toolElement.querySelector('.increase-health-75');
 
-                // Initialize data for this tool instance
-                let currentBudget = savedData.currentBudget || 0;
-                let maxBudget = savedData.maxBudget || 0;
-                let transactions = savedData.transactions || [];
-                let trackerTitle = savedTitle;
-
-                // Store references and data for this instance
-                toolInstances[instanceIndex] = {
-                    toolElement,
-                    currentBudget,
-                    maxBudget,
-                    transactions,
-                    trackerTitle,
-                    // Add references to elements if you need to access them directly from toolInstances array
-                    initialBudgetInput,
-                    trackerTitleInput,
-                    transactionsContainer,
-                    healthBar,
-                    currentBudgetDisplay,
-                    maxBudgetDisplay,
-                    effectMessage
+                // Initialize data for this tool instance from initialData or defaults
+                let instanceData = {
+                    currentBudget: initialData.currentBudget || 0,
+                    maxBudget: initialData.maxBudget || 0,
+                    transactions: initialData.transactions || [],
+                    trackerTitle: initialData.trackerTitle || 'PKMN Budget Tracker',
+                    toolElement: toolElement // Store reference to its own DOM element
                 };
+                
+                // Add this instance's data object to the global toolInstances array
+                toolInstances[instanceIndex] = instanceData;
 
-                // Set initial values from loaded data
-                if (maxBudget > 0) {
-                    initialBudgetInput.value = maxBudget;
+                // Set initial values in the UI from instanceData
+                if (instanceData.maxBudget > 0) {
+                    initialBudgetInput.value = instanceData.maxBudget;
                 }
-                trackerTitleInput.value = trackerTitle;
-                transactions.forEach(t => addTransactionToHistory(t));
+                trackerTitleInput.value = instanceData.trackerTitle;
+                // Populate transaction history
+                instanceData.transactions.forEach(t => addTransactionToHistory(t, transactionsContainer));
                 updateBudgetDisplay();
 
                 // Update the main page title only if it's the first tracker
                 if (instanceIndex === 0) {
-                    document.getElementById('page-title').textContent = trackerTitle;
+                    document.getElementById('page-title').textContent = instanceData.trackerTitle;
                 }
 
                 // Event Listeners
                 trackerTitleInput.addEventListener('change', function() {
-                    toolInstances[instanceIndex].trackerTitle = this.value;
+                    instanceData.trackerTitle = this.value;
                     if (instanceIndex === 0) {
                         document.getElementById('page-title').textContent = this.value;
                     }
-                    saveToolData();
+                    saveAllToolStates();
                 });
 
                 initialBudgetInput.addEventListener('change', function() {
-                    maxBudget = Number(this.value);
-                    currentBudget = maxBudget;
-                    toolInstances[instanceIndex].maxBudget = maxBudget;
-                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    instanceData.maxBudget = Number(this.value);
+                    instanceData.currentBudget = instanceData.maxBudget; // Set current to max initially
                     updateBudgetDisplay();
-                    saveToolData();
+                    saveAllToolStates();
                 });
 
                 addTransactionBtn.addEventListener('click', function() {
-                    if (maxBudget === 0) {
+                    if (instanceData.maxBudget === 0) {
                         alert('Please set an initial budget first!');
                         return;
                     }
@@ -371,7 +349,7 @@
                         return;
                     }
 
-                    if (type === 'expense' && amount > currentBudget) {
+                    if (type === 'expense' && amount > instanceData.currentBudget) {
                         alert('Not enough budget!');
                         return;
                     }
@@ -383,32 +361,30 @@
                         date: new Date().toLocaleDateString()
                     };
 
-                    transactions.push(transaction);
-                    toolInstances[instanceIndex].transactions = transactions; // Update the stored array
+                    instanceData.transactions.push(transaction);
 
                     if (type === 'expense') {
-                        currentBudget -= amount;
+                        instanceData.currentBudget -= amount;
                     } else {
-                        currentBudget += amount;
+                        instanceData.currentBudget += amount;
                     }
-                    toolInstances[instanceIndex].currentBudget = currentBudget; // Update stored budget
 
                     updateBudgetDisplay();
-                    addTransactionToHistory(transaction);
-                    saveToolData();
+                    addTransactionToHistory(transaction, transactionsContainer);
+                    saveAllToolStates();
 
                     amountInput.value = '';
                     descriptionInput.value = '';
                 });
 
                 exportTransactionsBtn.addEventListener('click', function() {
-                    if (transactions.length === 0) {
+                    if (instanceData.transactions.length === 0) {
                         alert('No transactions to export!');
                         return;
                     }
 
                     let exportData = "Date\tDescription\tAmount\tType\n";
-                    transactions.forEach(t => {
+                    instanceData.transactions.forEach(t => {
                         exportData += `${t.date}\t${t.description}\t${t.amount.toFixed(2)}\t${t.type}\n`;
                     });
 
@@ -416,7 +392,7 @@
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `budget_transactions_tracker_${instanceIndex}.txt`;
+                    a.download = `${instanceData.trackerTitle.replace(/\s/g, '_')}_transactions.txt`; // Dynamic filename
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
@@ -426,71 +402,51 @@
                 resetTransactionsBtn.addEventListener('click', function() {
                     if (confirm('Are you sure you want to reset all data for this tracker? This cannot be undone.')) {
                         transactionsContainer.innerHTML = '';
-                        currentBudget = 0;
-                        maxBudget = 0;
-                        transactions = []; // Reset local array
-                        trackerTitle = 'PKMN Budget Tracker'; // Reset local title
-
-                        // Update the stored instance data
-                        toolInstances[instanceIndex].currentBudget = currentBudget;
-                        toolInstances[instanceIndex].maxBudget = maxBudget;
-                        toolInstances[instanceIndex].transactions = transactions;
-                        toolInstances[instanceIndex].trackerTitle = trackerTitle;
+                        instanceData.currentBudget = 0;
+                        instanceData.maxBudget = 0;
+                        instanceData.transactions = [];
+                        instanceData.trackerTitle = 'PKMN Budget Tracker';
 
                         initialBudgetInput.value = '';
-                        trackerTitleInput.value = trackerTitle;
+                        trackerTitleInput.value = instanceData.trackerTitle;
                         updateBudgetDisplay();
-                        saveToolData(); // Save the reset state
+                        saveAllToolStates();
                     }
                 });
 
-                // NEW: Remove Tracker Button Event Listener
                 removeTrackerBtn.addEventListener('click', function() {
                     if (confirm('Are you sure you want to remove this tracker? All its data will be lost.')) {
                         // Remove the HTML element from the DOM
                         toolElement.remove();
 
-                        // Remove the instance data from the toolInstances array
-                        // Using splice might shift indices, so setting to null or filtering is safer
-                        toolInstances[instanceIndex] = null; // Mark for removal
-
-                        // Re-save all tool states to re-index and clean up localStorage
-                        // Filter out nulls and re-assign toolInstances
-                        toolInstances = toolInstances.filter(instance => instance !== null);
-                        saveAllToolStates();
-
-                        // If the removed tracker was the first one, update the page title
-                        if (instanceIndex === 0 && toolInstances.length > 0) {
-                            document.getElementById('page-title').textContent = toolInstances[0].trackerTitle;
-                        } else if (toolInstances.length === 0) {
-                            document.getElementById('page-title').textContent = 'PKMN Budget Tracker';
-                        }
+                        // Remove this instance from the toolInstances array
+                        toolInstances.splice(instanceIndex, 1); 
+                        
+                        // Re-initialize all remaining tools to update their instanceIndex and re-bind events
+                        // This is a simpler way to handle re-indexing than complex filtering/mapping
+                        loadAllToolStates(); // Rebuilds the entire UI from the new toolInstances array
                     }
                 });
 
-
                 decreaseHealthBtn.addEventListener('click', function() {
-                    if (maxBudget === 0) return;
-                    currentBudget = Math.max(0, currentBudget - 10);
-                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    if (instanceData.maxBudget === 0) return;
+                    instanceData.currentBudget = Math.max(0, instanceData.currentBudget - 10);
                     updateBudgetDisplay();
-                    saveToolData();
+                    saveAllToolStates();
                 });
 
                 increaseHealthBtn.addEventListener('click', function() {
-                    if (maxBudget === 0) return;
-                    currentBudget = Math.min(maxBudget, currentBudget + 10);
-                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    if (instanceData.maxBudget === 0) return;
+                    instanceData.currentBudget = Math.min(instanceData.maxBudget, instanceData.currentBudget + 10);
                     updateBudgetDisplay();
-                    saveToolData();
+                    saveAllToolStates();
                 });
 
                 decreaseHealth75Btn.addEventListener('click', function() {
-                    if (maxBudget === 0) return;
-                    currentBudget = Math.max(0, currentBudget - 75);
-                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    if (instanceData.maxBudget === 0) return;
+                    instanceData.currentBudget = Math.max(0, instanceData.currentBudget - 75);
                     updateBudgetDisplay();
-                    saveToolData();
+                    saveAllToolStates();
 
                     effectMessage.style.opacity = '1';
                     setTimeout(() => {
@@ -499,15 +455,14 @@
                 });
 
                 increaseHealth75Btn.addEventListener('click', function() {
-                    if (maxBudget === 0) return;
-                    currentBudget = Math.min(maxBudget, currentBudget + 75);
-                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    if (instanceData.maxBudget === 0) return;
+                    instanceData.currentBudget = Math.min(instanceData.maxBudget, instanceData.currentBudget + 75);
                     updateBudgetDisplay();
-                    saveToolData();
+                    saveAllToolStates();
                 });
 
                 function updateBudgetDisplay() {
-                    const percentage = (maxBudget === 0) ? 0 : (currentBudget / maxBudget) * 100;
+                    const percentage = (instanceData.maxBudget === 0) ? 0 : (instanceData.currentBudget / instanceData.maxBudget) * 100;
                     healthBar.style.width = `${percentage}%`;
 
                     if (percentage > 60) {
@@ -518,11 +473,12 @@
                         healthBar.style.backgroundColor = '#F44336';
                     }
 
-                    currentBudgetDisplay.textContent = `$${currentBudget.toFixed(2)}`;
-                    maxBudgetDisplay.textContent = `/ $${maxBudget.toFixed(2)}`;
+                    currentBudgetDisplay.textContent = `$${instanceData.currentBudget.toFixed(2)}`;
+                    maxBudgetDisplay.textContent = `/ $${instanceData.maxBudget.toFixed(2)}`;
                 }
 
-                function addTransactionToHistory(transaction) {
+                // transactionsContainer is passed as an argument to ensure it's the correct one for this instance
+                function addTransactionToHistory(transaction, container) {
                     const transactionElement = document.createElement('div');
                     transactionElement.className = 'transaction-item';
 
@@ -541,7 +497,7 @@
                     transactionElement.appendChild(dateElement);
                     transactionElement.appendChild(amountElement);
 
-                    transactionsContainer.prepend(transactionElement);
+                    container.prepend(transactionElement);
                 }
             }
 
@@ -551,7 +507,7 @@
                 const newToolElement = clone.querySelector('.container');
                 toolsContainer.appendChild(newToolElement);
                 const instanceIndex = toolInstances.length; // Get the next available index
-                initializeTool(newToolElement, instanceIndex);
+                initializeTool(newToolElement, instanceIndex, {}); // Initialize with default empty data
                 saveAllToolStates(); // Save the new state
             }
 
@@ -564,6 +520,3 @@
     </script>
 </body>
 </html>
-
-</html>
-
