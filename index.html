@@ -24,6 +24,7 @@
             padding: 30px;
             width: 100%;
             max-width: 500px;
+            margin-bottom: 30px; /* Add margin between multiple tools */
         }
         
         h1 {
@@ -67,6 +68,8 @@
             background-size: contain;
             background-repeat: no-repeat;
             background-position: center;
+            /* Add a placeholder image for the pokeball */
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/><path d="M5 50h90" stroke="black" stroke-width="5"/><circle cx="50" cy="50" r="15" fill="white" stroke="black" stroke-width="5"/><circle cx="50" cy="50" r="8" fill="black"/></svg>');
         }
         
         .health-info {
@@ -141,7 +144,7 @@
             color: #4CAF50;
         }
         
-        #effect-message {
+        .effect-message { /* Changed from #effect-message to class */
             color: #D32F2F;
             font-weight: bold;
             text-align: center;
@@ -158,282 +161,409 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <input type="text" id="tracker-title" value="PKMN Budget Tracker" style="width:100%; font-size:28px; text-align:center; margin-bottom:30px; border:none; border-bottom:2px solid #333; padding-bottom:10px; font-weight:bold;">
-        
-        <div class="pokemon-health-display">
-            <div class="health-bars">
-                <div class="health-bar-container">
-                    <div class="health-bar" id="health-bar"></div>
+    <!-- Template for a single budget tracker tool -->
+    <template id="tool-template">
+        <div class="container">
+            <input type="text" class="tracker-title" value="PKMN Budget Tracker" style="width:100%; font-size:28px; text-align:center; margin-bottom:30px; border:none; border-bottom:2px solid #333; padding-bottom:10px; font-weight:bold;">
+            
+            <div class="pokemon-health-display">
+                <div class="health-bars">
+                    <div class="health-bar-container">
+                        <div class="health-bar"></div>
+                    </div>
+                    <div class="pokeball"></div>
                 </div>
-                <div class="pokeball"></div>
+                <div class="health-info">
+                    <span class="current-budget">$0</span>
+                    <span class="max-budget">/ $0</span>
+                </div>
+                <div class="effect-message">It's Super Effective!</div>
+                <div class="health-controls">
+                    <button class="decrease-health-75" style="background-color: #EF9A9A;">-75</button>
+                    <button class="decrease-health" style="background-color: #FFCDD2;">-10</button>
+                    <button class="increase-health" style="background-color: #BBDEFB;">+10</button>
+                    <button class="increase-health-75" style="background-color: #90CAF9;">+75</button>
+                </div>
             </div>
-            <div class="health-info">
-                <span id="current-budget">$0</span>
-                <span id="max-budget">/ $0</span>
+            
+            <div class="input-section">
+                <input type="number" class="initial-budget" placeholder="Enter initial budget" min="0">
+                
+                <select class="transaction-type">
+                    <option value="expense">Expense</option>
+                    <option value="income">Income</option>
+                </select>
+                
+                <input type="number" class="amount" placeholder="Enter amount" min="0">
+                
+                <input type="text" class="description" placeholder="Transaction description">
+                
+                <button class="add-transaction">Add Transaction</button>
+                <button class="reset-transactions" style="background-color: #E53935; color: white; margin-right: 10px;">Reset All Data</button>
+                <button class="export-transactions" style="background-color: #4CAF50; color: white;">Export History</button>
             </div>
-            <div id="effect-message">It's Super Effective!</div>
-            <div class="health-controls">
-                <button id="decrease-health-75" style="background-color: #EF9A9A;">-75</button>
-                <button id="decrease-health" style="background-color: #FFCDD2;">-10</button>
-                <button id="increase-health" style="background-color: #BBDEFB;">+10</button>
-                <button id="increase-health-75" style="background-color: #90CAF9;">+75</button>
+            
+            <div class="transaction-history">
+                <h3>Transaction History</h3>
+                <div class="transactions"></div>
             </div>
+            <!-- NEW: Remove button for this instance -->
+            <button class="remove-tracker" style="background-color: #D32F2F; color: white; margin-top: 20px;">Remove This Tracker</button>
         </div>
-        
-        <div class="input-section">
-            <input type="number" id="initial-budget" placeholder="Enter initial budget" min="0">
-            
-            <select id="transaction-type">
-                <option value="expense">Expense</option>
-                <option value="income">Income</option>
-            </select>
-            
-            <input type="number" id="amount" placeholder="Enter amount" min="0">
-            
-            <input type="text" id="description" placeholder="Transaction description">
-            
-            <button id="add-transaction">Add Transaction</button>
-            <button id="reset-transactions" style="background-color: #E53935; color: white; margin-right: 10px;">Reset All Data</button>
-            <button id="export-transactions" style="background-color: #4CAF50; color: white;">Export History</button>
-        </div>
-        
-        <div class="transaction-history">
-            <h3>Transaction History</h3>
-            <div id="transactions"></div>
-        </div>
-    </div>
+    </template>
+
+    <!-- Container where all tool instances will be appended -->
+    <div id="tools-container"></div>
+
+    <!-- Button to add new tool instances -->
+    <button id="add-new-tool" style="margin-top: 20px; padding: 15px 30px; font-size: 18px;">Add New Tracker</button>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            let currentBudget = 0;
-            let maxBudget = 0;
-            const transactions = JSON.parse(localStorage.getItem('budgetTransactions')) || [];
-            
-            const initialBudgetInput = document.getElementById('initial-budget');
-            const transactionTypeSelect = document.getElementById('transaction-type');
-            const amountInput = document.getElementById('amount');
-            const descriptionInput = document.getElementById('description');
-            const addTransactionBtn = document.getElementById('add-transaction');
-            const healthBar = document.getElementById('health-bar');
-            const currentBudgetDisplay = document.getElementById('current-budget');
-            const maxBudgetDisplay = document.getElementById('max-budget');
-            const transactionsContainer = document.getElementById('transactions');
-            const effectMessage = document.getElementById('effect-message');
-            
-            // Load saved data when page loads
-            function loadSavedData() {
-                const savedBudget = localStorage.getItem('currentBudget');
-                const savedMaxBudget = localStorage.getItem('maxBudget');
-                const savedTransactions = JSON.parse(localStorage.getItem('budgetTransactions'));
-                
-                if (savedBudget) currentBudget = Number(savedBudget);
-                if (savedMaxBudget) maxBudget = Number(savedMaxBudget);
-                if (savedTransactions && savedTransactions.length) {
-                    initialBudgetInput.value = maxBudget;
-                    savedTransactions.forEach(t => {
-                        addTransactionToHistory(t);
-                    });
-                    updateBudgetDisplay();
-                }
-            }
-            
-            // Load tracker title if saved
-            const savedTitle = localStorage.getItem('trackerTitle');
-            const titleInput = document.getElementById('tracker-title');
-            if (savedTitle) {
-                titleInput.value = savedTitle;
-            }
-            titleInput.addEventListener('change', function() {
-                localStorage.setItem('trackerTitle', this.value);
-                document.getElementById('page-title').textContent = this.value;
-            });
+            const toolTemplate = document.getElementById('tool-template');
+            const toolsContainer = document.getElementById('tools-container');
+            const addNewToolBtn = document.getElementById('add-new-tool');
 
-            loadSavedData();
-            
-            // Set initial budget when user types in the initial budget field
-            initialBudgetInput.addEventListener('change', function() {
-                maxBudget = Number(this.value);
-                currentBudget = maxBudget; // Set current budget to max budget initially
-                updateBudgetDisplay();
-            });
-            
-            // Add transaction button click handler
-            addTransactionBtn.addEventListener('click', function() {
-                if (maxBudget === 0) {
-                    alert('Please set an initial budget first!');
-                    return;
+            // This will now store objects with tool data and potentially a reference to the DOM element
+            let toolInstances = []; 
+
+            // Function to save the entire state of all tools
+            function saveAllToolStates() {
+                // Clear all existing tool data from localStorage
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('toolData_') || key.startsWith('trackerTitle_')) {
+                        localStorage.removeItem(key);
+                    }
                 }
-                
-                const amount = Number(amountInput.value);
-                const description = descriptionInput.value;
-                const type = transactionTypeSelect.value;
-                
-                if (amount <= 0) {
-                    alert('Please enter a valid amount');
-                    return;
-                }
-                
-                if (!description) {
-                    alert('Please enter a description');
-                    return;
-                }
-                
-                if (type === 'expense' && amount > currentBudget) {
-                    alert('Not enough budget!');
-                    return;
-                }
-                
-                // Record transaction
-                const transaction = {
-                    type: type,
-                    amount: amount,
-                    description: description,
-                    date: new Date().toLocaleDateString()
-                };
-                
-                transactions.push(transaction);
-                
-                // Update budget
-                if (type === 'expense') {
-                    currentBudget -= amount;
-                } else {
-                    currentBudget += amount;
-                }
-                
-                // Update display
-                updateBudgetDisplay();
-                addTransactionToHistory(transaction);
-                
-                // Save transactions to localStorage
-                localStorage.setItem('budgetTransactions', JSON.stringify(transactions));
-                localStorage.setItem('currentBudget', currentBudget);
-                localStorage.setItem('maxBudget', maxBudget);
-                
-                // Clear input fields
-                amountInput.value = '';
-                descriptionInput.value = '';
-            });
-            
-            // Export transactions handler
-            document.getElementById('export-transactions').addEventListener('click', function() {
-                if (transactions.length === 0) {
-                    alert('No transactions to export!');
-                    return;
-                }
-                
-                let exportData = "Date\tDescription\tAmount\tType\n";
-                transactions.forEach(t => {
-                    exportData += `${t.date}\t${t.description}\t${t.amount.toFixed(2)}\t${t.type}\n`;
+                // Save current tool states with new indices
+                toolInstances.forEach((instance, index) => {
+                    if (instance) { // Ensure instance exists (not null after removal)
+                        localStorage.setItem(`toolData_${index}`, JSON.stringify({
+                            currentBudget: instance.currentBudget,
+                            maxBudget: instance.maxBudget,
+                            transactions: instance.transactions
+                        }));
+                        localStorage.setItem(`trackerTitle_${index}`, instance.trackerTitle);
+                    }
                 });
-                
-                const blob = new Blob([exportData], {type: 'text/plain'});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'budget_transactions.txt';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            });
+            }
 
-            // Reset button click handler
-            document.getElementById('reset-transactions').addEventListener('click', function() {
-                if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
-                    // Clear localStorage
-                    localStorage.removeItem('budgetTransactions');
-                    localStorage.removeItem('currentBudget');
-                    localStorage.removeItem('maxBudget');
-                    localStorage.removeItem('trackerTitle');
-                    document.getElementById('tracker-title').value = 'PKMN Budget Tracker';
-                    
-                    // Clear UI
-                    transactionsContainer.innerHTML = '';
-                    currentBudget = 0;
-                    maxBudget = 0;
-                    initialBudgetInput.value = '';
+            // Function to load all tool states and re-render them
+            function loadAllToolStates() {
+                // Clear existing tools from the DOM
+                toolsContainer.innerHTML = '';
+                toolInstances = []; // Reset the array
+
+                let i = 0;
+                while (localStorage.getItem(`toolData_${i}`)) {
+                    const savedData = JSON.parse(localStorage.getItem(`toolData_${i}`));
+                    const savedTitle = localStorage.getItem(`trackerTitle_${i}`);
+
+                    const clone = toolTemplate.content.cloneNode(true);
+                    const newToolElement = clone.querySelector('.container');
+                    toolsContainer.appendChild(newToolElement);
+
+                    // Initialize the tool with loaded data
+                    initializeTool(newToolElement, i, savedData, savedTitle);
+                    i++;
+                }
+                // If no tools were loaded, add one default tool
+                if (i === 0) {
+                    addNewToolInstance();
+                }
+            }
+
+            function initializeTool(toolElement, instanceIndex, savedData = {}, savedTitle = 'PKMN Budget Tracker') {
+                // Get references to elements *within this specific tool instance*
+                const initialBudgetInput = toolElement.querySelector('.initial-budget');
+                const transactionTypeSelect = toolElement.querySelector('.transaction-type');
+                const amountInput = toolElement.querySelector('.amount');
+                const descriptionInput = toolElement.querySelector('.description');
+                const addTransactionBtn = toolElement.querySelector('.add-transaction');
+                const healthBar = toolElement.querySelector('.health-bar');
+                const currentBudgetDisplay = toolElement.querySelector('.current-budget');
+                const maxBudgetDisplay = toolElement.querySelector('.max-budget');
+                const transactionsContainer = toolElement.querySelector('.transactions');
+                const effectMessage = toolElement.querySelector('.effect-message');
+                const trackerTitleInput = toolElement.querySelector('.tracker-title');
+                const resetTransactionsBtn = toolElement.querySelector('.reset-transactions');
+                const exportTransactionsBtn = toolElement.querySelector('.export-transactions');
+                const removeTrackerBtn = toolElement.querySelector('.remove-tracker'); // NEW: Remove button
+
+                // Health control buttons
+                const decreaseHealth75Btn = toolElement.querySelector('.decrease-health-75');
+                const decreaseHealthBtn = toolElement.querySelector('.decrease-health');
+                const increaseHealthBtn = toolElement.querySelector('.increase-health');
+                const increaseHealth75Btn = toolElement.querySelector('.increase-health-75');
+
+                // Initialize data for this tool instance
+                let currentBudget = savedData.currentBudget || 0;
+                let maxBudget = savedData.maxBudget || 0;
+                let transactions = savedData.transactions || [];
+                let trackerTitle = savedTitle;
+
+                // Store references and data for this instance
+                toolInstances[instanceIndex] = {
+                    toolElement,
+                    currentBudget,
+                    maxBudget,
+                    transactions,
+                    trackerTitle,
+                    // Add references to elements if you need to access them directly from toolInstances array
+                    initialBudgetInput,
+                    trackerTitleInput,
+                    transactionsContainer,
+                    healthBar,
+                    currentBudgetDisplay,
+                    maxBudgetDisplay,
+                    effectMessage
+                };
+
+                // Set initial values from loaded data
+                if (maxBudget > 0) {
+                    initialBudgetInput.value = maxBudget;
+                }
+                trackerTitleInput.value = trackerTitle;
+                transactions.forEach(t => addTransactionToHistory(t));
+                updateBudgetDisplay();
+
+                // Update the main page title only if it's the first tracker
+                if (instanceIndex === 0) {
+                    document.getElementById('page-title').textContent = trackerTitle;
+                }
+
+                // Event Listeners
+                trackerTitleInput.addEventListener('change', function() {
+                    toolInstances[instanceIndex].trackerTitle = this.value;
+                    if (instanceIndex === 0) {
+                        document.getElementById('page-title').textContent = this.value;
+                    }
+                    saveToolData();
+                });
+
+                initialBudgetInput.addEventListener('change', function() {
+                    maxBudget = Number(this.value);
+                    currentBudget = maxBudget;
+                    toolInstances[instanceIndex].maxBudget = maxBudget;
+                    toolInstances[instanceIndex].currentBudget = currentBudget;
                     updateBudgetDisplay();
+                    saveToolData();
+                });
+
+                addTransactionBtn.addEventListener('click', function() {
+                    if (maxBudget === 0) {
+                        alert('Please set an initial budget first!');
+                        return;
+                    }
+
+                    const amount = Number(amountInput.value);
+                    const description = descriptionInput.value;
+                    const type = transactionTypeSelect.value;
+
+                    if (amount <= 0) {
+                        alert('Please enter a valid amount');
+                        return;
+                    }
+
+                    if (!description) {
+                        alert('Please enter a description');
+                        return;
+                    }
+
+                    if (type === 'expense' && amount > currentBudget) {
+                        alert('Not enough budget!');
+                        return;
+                    }
+
+                    const transaction = {
+                        type: type,
+                        amount: amount,
+                        description: description,
+                        date: new Date().toLocaleDateString()
+                    };
+
+                    transactions.push(transaction);
+                    toolInstances[instanceIndex].transactions = transactions; // Update the stored array
+
+                    if (type === 'expense') {
+                        currentBudget -= amount;
+                    } else {
+                        currentBudget += amount;
+                    }
+                    toolInstances[instanceIndex].currentBudget = currentBudget; // Update stored budget
+
+                    updateBudgetDisplay();
+                    addTransactionToHistory(transaction);
+                    saveToolData();
+
+                    amountInput.value = '';
+                    descriptionInput.value = '';
+                });
+
+                exportTransactionsBtn.addEventListener('click', function() {
+                    if (transactions.length === 0) {
+                        alert('No transactions to export!');
+                        return;
+                    }
+
+                    let exportData = "Date\tDescription\tAmount\tType\n";
+                    transactions.forEach(t => {
+                        exportData += `${t.date}\t${t.description}\t${t.amount.toFixed(2)}\t${t.type}\n`;
+                    });
+
+                    const blob = new Blob([exportData], {type: 'text/plain'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `budget_transactions_tracker_${instanceIndex}.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                });
+
+                resetTransactionsBtn.addEventListener('click', function() {
+                    if (confirm('Are you sure you want to reset all data for this tracker? This cannot be undone.')) {
+                        transactionsContainer.innerHTML = '';
+                        currentBudget = 0;
+                        maxBudget = 0;
+                        transactions = []; // Reset local array
+                        trackerTitle = 'PKMN Budget Tracker'; // Reset local title
+
+                        // Update the stored instance data
+                        toolInstances[instanceIndex].currentBudget = currentBudget;
+                        toolInstances[instanceIndex].maxBudget = maxBudget;
+                        toolInstances[instanceIndex].transactions = transactions;
+                        toolInstances[instanceIndex].trackerTitle = trackerTitle;
+
+                        initialBudgetInput.value = '';
+                        trackerTitleInput.value = trackerTitle;
+                        updateBudgetDisplay();
+                        saveToolData(); // Save the reset state
+                    }
+                });
+
+                // NEW: Remove Tracker Button Event Listener
+                removeTrackerBtn.addEventListener('click', function() {
+                    if (confirm('Are you sure you want to remove this tracker? All its data will be lost.')) {
+                        // Remove the HTML element from the DOM
+                        toolElement.remove();
+
+                        // Remove the instance data from the toolInstances array
+                        // Using splice might shift indices, so setting to null or filtering is safer
+                        toolInstances[instanceIndex] = null; // Mark for removal
+
+                        // Re-save all tool states to re-index and clean up localStorage
+                        // Filter out nulls and re-assign toolInstances
+                        toolInstances = toolInstances.filter(instance => instance !== null);
+                        saveAllToolStates();
+
+                        // If the removed tracker was the first one, update the page title
+                        if (instanceIndex === 0 && toolInstances.length > 0) {
+                            document.getElementById('page-title').textContent = toolInstances[0].trackerTitle;
+                        } else if (toolInstances.length === 0) {
+                            document.getElementById('page-title').textContent = 'PKMN Budget Tracker';
+                        }
+                    }
+                });
+
+
+                decreaseHealthBtn.addEventListener('click', function() {
+                    if (maxBudget === 0) return;
+                    currentBudget = Math.max(0, currentBudget - 10);
+                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    updateBudgetDisplay();
+                    saveToolData();
+                });
+
+                increaseHealthBtn.addEventListener('click', function() {
+                    if (maxBudget === 0) return;
+                    currentBudget = Math.min(maxBudget, currentBudget + 10);
+                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    updateBudgetDisplay();
+                    saveToolData();
+                });
+
+                decreaseHealth75Btn.addEventListener('click', function() {
+                    if (maxBudget === 0) return;
+                    currentBudget = Math.max(0, currentBudget - 75);
+                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    updateBudgetDisplay();
+                    saveToolData();
+
+                    effectMessage.style.opacity = '1';
+                    setTimeout(() => {
+                        effectMessage.style.opacity = '0';
+                    }, 2000);
+                });
+
+                increaseHealth75Btn.addEventListener('click', function() {
+                    if (maxBudget === 0) return;
+                    currentBudget = Math.min(maxBudget, currentBudget + 75);
+                    toolInstances[instanceIndex].currentBudget = currentBudget;
+                    updateBudgetDisplay();
+                    saveToolData();
+                });
+
+                function updateBudgetDisplay() {
+                    const percentage = (maxBudget === 0) ? 0 : (currentBudget / maxBudget) * 100;
+                    healthBar.style.width = `${percentage}%`;
+
+                    if (percentage > 60) {
+                        healthBar.style.backgroundColor = '#4CAF50';
+                    } else if (percentage > 30) {
+                        healthBar.style.backgroundColor = '#FFC107';
+                    } else {
+                        healthBar.style.backgroundColor = '#F44336';
+                    }
+
+                    currentBudgetDisplay.textContent = `$${currentBudget.toFixed(2)}`;
+                    maxBudgetDisplay.textContent = `/ $${maxBudget.toFixed(2)}`;
                 }
-            });
 
-            // Health control buttons
-            document.getElementById('decrease-health').addEventListener('click', function() {
-                if (maxBudget === 0) return;
-                currentBudget = Math.max(0, currentBudget - 10);
-                updateBudgetDisplay();
-                localStorage.setItem('currentBudget', currentBudget);
-            });
+                function addTransactionToHistory(transaction) {
+                    const transactionElement = document.createElement('div');
+                    transactionElement.className = 'transaction-item';
 
-            document.getElementById('increase-health').addEventListener('click', function() {
-                if (maxBudget === 0) return;
-                currentBudget = Math.min(maxBudget, currentBudget + 10);
-                updateBudgetDisplay();
-                localStorage.setItem('currentBudget', currentBudget);
-            });
+                    const descriptionElement = document.createElement('span');
+                    descriptionElement.textContent = `${transaction.description}`;
 
-            document.getElementById('decrease-health-75').addEventListener('click', function() {
-                if (maxBudget === 0) return;
-                currentBudget = Math.max(0, currentBudget - 75);
-                updateBudgetDisplay();
-                localStorage.setItem('currentBudget', currentBudget);
-                
-                // Show super effective message
-                effectMessage.style.opacity = '1';
-                setTimeout(() => {
-                    effectMessage.style.opacity = '0';
-                }, 2000);
-            });
+                    const amountElement = document.createElement('span');
+                    amountElement.textContent = `$${transaction.amount.toFixed(2)}`;
+                    amountElement.className = transaction.type === 'expense' ? 'cost' : 'positive';
 
-            document.getElementById('increase-health-75').addEventListener('click', function() {
-                if (maxBudget === 0) return;
-                currentBudget = Math.min(maxBudget, currentBudget + 75);
-                updateBudgetDisplay();
-                localStorage.setItem('currentBudget', currentBudget);
-            });
-            
-            function updateBudgetDisplay() {
-                // Update health bar
-                const percentage = (currentBudget / maxBudget) * 100;
-                healthBar.style.width = `${percentage}%`;
-                
-                // Change health bar color based on percentage
-                if (percentage > 60) {
-                    healthBar.style.backgroundColor = '#4CAF50'; // Green
-                } else if (percentage > 30) {
-                    healthBar.style.backgroundColor = '#FFC107'; // Yellow
-                } else {
-                    healthBar.style.backgroundColor = '#F44336'; // Red
+                    const dateElement = document.createElement('span');
+                    dateElement.textContent = transaction.date;
+                    dateElement.style.color = '#777';
+
+                    transactionElement.appendChild(descriptionElement);
+                    transactionElement.appendChild(dateElement);
+                    transactionElement.appendChild(amountElement);
+
+                    transactionsContainer.prepend(transactionElement);
                 }
-                
-                // Update budget display
-                currentBudgetDisplay.textContent = `$${currentBudget.toFixed(2)}`;
-                maxBudgetDisplay.textContent = `/ $${maxBudget.toFixed(2)}`;
             }
-            
-            function addTransactionToHistory(transaction) {
-                const transactionElement = document.createElement('div');
-                transactionElement.className = 'transaction-item';
-                
-                const descriptionElement = document.createElement('span');
-                descriptionElement.textContent = `${transaction.description}`;
-                
-                const amountElement = document.createElement('span');
-                amountElement.textContent = `$${transaction.amount.toFixed(2)}`;
-                amountElement.className = transaction.type === 'expense' ? 'cost' : 'positive';
-                
-                const dateElement = document.createElement('span');
-                dateElement.textContent = transaction.date;
-                dateElement.style.color = '#777';
-                
-                transactionElement.appendChild(descriptionElement);
-                transactionElement.appendChild(dateElement);
-                transactionElement.appendChild(amountElement);
-                
-                transactionsContainer.prepend(transactionElement);
+
+            // Function to add a new tool instance
+            function addNewToolInstance() {
+                const clone = toolTemplate.content.cloneNode(true);
+                const newToolElement = clone.querySelector('.container');
+                toolsContainer.appendChild(newToolElement);
+                const instanceIndex = toolInstances.length; // Get the next available index
+                initializeTool(newToolElement, instanceIndex);
+                saveAllToolStates(); // Save the new state
             }
+
+            // Add event listener for the "Add New Tracker" button
+            addNewToolBtn.addEventListener('click', addNewToolInstance);
+
+            // Load all tool states when the page loads
+            loadAllToolStates();
         });
     </script>
 </body>
+</html>
+
 </html>
 
